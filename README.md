@@ -1,6 +1,6 @@
-# 🌍 SISTEMA IoT PARA MONITORAMENTO AMBIENTAL DE ENCOSTAS E PREVENÇÃO DE DESLIZAMENTOS
+# 🌍 SISTEMA IOT PARA MONITORAMENTO DE ENCOSTAS E PREVENÇÃO DE DESLIZAMENTOS
 
-> Projeto interdisciplinar desenvolvido no SENAI - Jaraguá do Sul (CENTROWEG), integrando sensores ambientais com tecnologia embarcada para apoiar ações de prevenção a deslizamentos de terra.
+> Projeto interdisciplinar desenvolvido no SENAI - Jaraguá do Sul (CENTROWEG), integrando sensores ambientais com tecnologia IoT  para apoiar ações de prevenção a deslizamentos de terra.
 
 ---
 
@@ -8,7 +8,9 @@
 
 - **Julia Gabrieli Garcia da Silva**  
 - **Raquel da Silva**  
-- **Eduarda Schwirkowski Dalsochio**  
+- **Eduarda Schwirkowski Dalsochio**
+
+## 👨‍💻 Orientador
 - **João Pedro Silva Valentim**
 
 **Instituição:** SENAI - Jaraguá do Sul - CENTROWEG  

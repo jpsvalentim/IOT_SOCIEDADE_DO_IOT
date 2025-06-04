@@ -1,34 +1,258 @@
-#include <Arduino.h>
+#define MQTT_MAX_PACKET_SIZE 512
 
-#define LED_PIN 2     // LED onboard no ESP32 geralmente é o GPIO 2
-#define BUTTON_PIN 14 // Botão (ligado entre GPIO 14 e GND)
-#define ADC_PIN 34    // Entrada analógica (GPIO 34)
+
+#include <Adafruit_BMP085.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_MPU6050.h>
+#include <ArduinoJson.h>
+#include <ArduinoJson.hpp>
+#include <DHT.h>
+#include <DHT_U.h>
+#include <Esp32WifiManager.h>
+#include <PubSubClient.h>
+
+
+const char* ssid = "";
+const char* password = "";
+const char* mqtt_server = "test.mosquitto.org";
+
+
+const int DHT11_PIN = 33;
+const int LDR_PIN = 32;
+const int SW520D_PIN = 4;
+const int SW420_PIN = 13;
+const int UMIDADESOLO_PIN = 12;
+
+
+WiFiClient WOKWI_client;
+PubSubClient client(WOKWI_client);
+DHT dht(DHT11_PIN, DHT11);
+Adafruit_MPU6050 mpu;
+Adafruit_BMP085 bmp;
+
+
+TwoWire MPU_I2C = TwoWire(0);
+TwoWire BMP_I2C = TwoWire(1);
+
+
+StaticJsonDocument<296> doc;
+
+
+void setup_wifi() {
+  delay(10);
+  Serial.println();
+  Serial.print("connecting to");
+  Serial.println(ssid);
+
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+
+  int tentativas = 0;
+  while (WiFi.status() != WL_CONNECTED && tentativas < 20) {
+    delay(500);
+    Serial.print(".");
+    tentativas++;
+  }
+
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("");
+    Serial.println("WiFi conectado!");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nFalha ao conectar ao Wi-Fi. Verifique SSID/senha.");
+  }
+}
+
+
+void setup_mpu6050() {
+  MPU_I2C.begin(27, 26);
+  while (!mpu.begin(0x68, &MPU_I2C)) {
+    Serial.println("Tentando inicializar MPU6050... Verifique a conexão!");
+    delay(2000);
+  }
+  Serial.println("MPU6050 inicializado com sucesso!");
+}
+
+
+void setup_bmp180() {
+  BMP_I2C.begin(21, 22);
+  while (!bmp.begin(BMP085_ULTRAHIGHRES, &BMP_I2C)) {
+    Serial.println("Tentando inicializar BMP180... Verifique a conexão!");
+    delay(2000);
+  }
+  Serial.println("BMP180 inicializado com sucesso!");
+}
+
+
+
+
+void wifiReconnect() {
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT conection...");
+    if (client.connect("WOKWI_client")) {
+      Serial.println("connected");
+    } else {
+      Serial.print("failed, rec=");
+      Serial.print(client.state());
+      Serial.println("Try again in 5 seconds");
+     
+      delay(5000);
+    }
+  }
+}
+
 
 void setup() {
   Serial.begin(115200);
-  pinMode(LED_PIN, OUTPUT);
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  analogReadResolution(12); // resolução de 12 bits: 0 a 4095
+
+
+  pinMode(18, OUTPUT);
+  pinMode(19, OUTPUT);
+  pinMode(LDR_PIN, INPUT);
+  pinMode(SW520D_PIN, INPUT);
+  pinMode(SW420_PIN, INPUT);
+  pinMode(UMIDADESOLO_PIN, INPUT);
+
+
+  Serial.println("Iniciando...");
+
+
+  setup_wifi();
+  setup_mpu6050();
+  setup_bmp180();
+  dht.begin();
+  client.setServer(mqtt_server, 1883);
 }
 
-void loop() {
-  // Pisca LED
-  Serial.println("Pisca LED...");
-  digitalWrite(LED_PIN, HIGH);
-  delay(500);
-  digitalWrite(LED_PIN, LOW);
-  delay(500);
 
-  // Lê botão
-  if (digitalRead(BUTTON_PIN) == LOW) {
-    Serial.println("Botão pressionado!");
-    delay(500);
+void Conectado_WiFi() {
+  if (WiFi.status()) {
+    digitalWrite(18, HIGH);
+  } else {
+    digitalWrite(18, LOW);
   }
+}
 
-  // Lê ADC
-  int adcVal = analogRead(ADC_PIN);
-  Serial.print("Valor ADC (GPIO34): ");
-  Serial.println(adcVal);
 
-  delay(1000);
+void Conectado_broker() {
+  if (client.connected()) {
+    digitalWrite(19, HIGH);
+  } else {
+    digitalWrite(19, LOW);
+  }
+}
+
+
+void LDR_value() {
+  int data = analogRead(LDR_PIN);
+  float voltage = data * (3.3 / 4095.0);
+  float rFixo = 10000;
+  float resistance = (voltage * rFixo) / (3.3 - voltage);
+  float lux = 500000.0 / resistance;
+
+
+  doc["lux"] = lux;
+}
+
+
+void SW520D_value() {
+  int inclinacao = digitalRead(SW520D_PIN);
+
+
+  doc["inclinação"] = inclinacao;
+}
+
+
+void SW420_value() {
+  int vibracao = digitalRead(SW420_PIN);
+
+
+  doc["vibracao"] = vibracao;
+}
+
+
+void MPU6050_value(){
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+
+
+  JsonObject acelerometro = doc.createNestedObject("acelerometro");
+  acelerometro["x"] = a.acceleration.x;
+  acelerometro["y"] = a.acceleration.y;
+  acelerometro["z"] = a.acceleration.z;
+
+
+  JsonObject giroscopio = doc.createNestedObject("giroscopio");
+  giroscopio["x"] = g.gyro.x;
+  giroscopio["y"] = g.gyro.y;
+  giroscopio["z"] = g.gyro.z;
+}
+
+
+void DHT11_value() {
+  float umidade = dht.readHumidity();
+  float temperatura = dht.readTemperature();
+
+
+  doc["temperatura"] = temperatura;
+  doc["umidade"] = umidade;
+}
+
+
+void BMP180_value() {
+  float pressao = bmp.readPressure();
+  float altitude = bmp.readAltitude(101500);
+
+
+  doc["pressão"] = pressao;
+  doc["altitude"] = altitude;
+}
+
+
+void UMIDADESOLO_value() {
+  float umidadeSolo = analogRead(UMIDADESOLO_PIN);
+
+
+  doc["umidadeSolo"] = umidadeSolo;
+}
+
+
+void data_publish() {
+  char buffer[256];
+  serializeJson(doc, buffer);
+
+
+  client.publish("monitoramento/encosta", buffer);
+
+
+  Serial.println("JSON publicado:");
+  serializeJsonPretty(doc, Serial);
+  Serial.println();
+
+
+  delay(2500);
+}
+
+
+void loop() {
+  wifiReconnect();
+  Conectado_WiFi();
+  Conectado_broker();
+
+
+  LDR_value();
+  SW520D_value();
+  SW420_value();
+  MPU6050_value();
+  DHT11_value();
+  BMP180_value();
+  UMIDADESOLO_value();
+
+
+  data_publish();
 }

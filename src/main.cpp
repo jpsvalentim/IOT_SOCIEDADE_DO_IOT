@@ -9,12 +9,12 @@
 #include <ArduinoJson.hpp>
 #include <DHT.h>
 #include <DHT_U.h>
-#include <Esp32WifiManager.h>
+#include <ESP_WiFiManager.h>
 #include <PubSubClient.h>
 
 
-const char* ssid = "";
-const char* password = "";
+const char* ssid = "Redmi Note 12S";
+const char* password = "12345678+-/";
 const char* mqtt_server = "test.mosquitto.org";
 
 

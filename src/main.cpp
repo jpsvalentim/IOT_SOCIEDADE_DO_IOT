@@ -13,8 +13,8 @@
 #include <PubSubClient.h>
 
 
-const char* ssid = "Redmi Note 12S";
-const char* password = "12345678+-/";
+const char* ssid = "FIESC_IOT";
+const char* password = "C6qnM4ag81";
 const char* mqtt_server = "test.mosquitto.org";
 
 
@@ -127,6 +127,7 @@ void setup() {
   setup_bmp180();
   dht.begin();
   client.setServer(mqtt_server, 1883);
+  Serial.println("🚀 ESP32 inicializado com sucesso!");
 }
 
 
@@ -245,6 +246,10 @@ void loop() {
   Conectado_broker();
 
 
+  client.loop(); // <--- ESSENCIAL para MQTT funcionar corretamente
+
+  doc.clear(); // <--- Limpa o JSON antes de preencher novamente
+
   LDR_value();
   SW520D_value();
   SW420_value();
@@ -254,5 +259,5 @@ void loop() {
   UMIDADESOLO_value();
 
 
-  data_publish();
+  // data_publish();
 }

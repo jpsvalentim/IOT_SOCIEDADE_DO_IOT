@@ -177,23 +177,23 @@ void SW420_value() {
 }
 
 
-void MPU6050_value(){
+void MPU6050_value() {
   sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
 
+  if (mpu.getEvent(&a, &g, &temp)) {
+    JsonObject acelerometro = doc.createNestedObject("acelerometro");
+    acelerometro["x"] = a.acceleration.x;
+    acelerometro["y"] = a.acceleration.y;
+    acelerometro["z"] = a.acceleration.z;
 
-  JsonObject acelerometro = doc.createNestedObject("acelerometro");
-  acelerometro["x"] = a.acceleration.x;
-  acelerometro["y"] = a.acceleration.y;
-  acelerometro["z"] = a.acceleration.z;
-
-
-  JsonObject giroscopio = doc.createNestedObject("giroscopio");
-  giroscopio["x"] = g.gyro.x;
-  giroscopio["y"] = g.gyro.y;
-  giroscopio["z"] = g.gyro.z;
+    JsonObject giroscopio = doc.createNestedObject("giroscopio");
+    giroscopio["x"] = g.gyro.x;
+    giroscopio["y"] = g.gyro.y;
+    giroscopio["z"] = g.gyro.z;
+  } else {
+    Serial.println("❌ Erro ao acessar MPU6050!");
+  }
 }
-
 
 void DHT11_value() {
   float umidade = dht.readHumidity();
@@ -206,12 +206,14 @@ void DHT11_value() {
 
 
 void BMP180_value() {
-  float pressao = bmp.readPressure();
-  float altitude = bmp.readAltitude(101500);
-
-
-  doc["pressão"] = pressao;
-  doc["altitude"] = altitude;
+  if (bmp.begin(BMP085_ULTRAHIGHRES, &BMP_I2C)) {
+    float pressao = bmp.readPressure();
+    float altitude = bmp.readAltitude(101500);
+    doc["pressao"] = pressao;
+    doc["altitude"] = altitude;
+  } else {
+    Serial.println("❌ Erro ao acessar BMP180!");
+  }
 }
 
 

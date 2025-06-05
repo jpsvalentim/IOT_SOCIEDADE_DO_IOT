@@ -24,6 +24,9 @@ const int SW520D_PIN = 4;
 const int SW420_PIN = 13;
 const int UMIDADESOLO_PIN = 12;
 
+bool bmp_ok = false;
+bool mpu_ok = false;
+
 
 WiFiClient WOKWI_client;
 PubSubClient client(WOKWI_client);
@@ -70,24 +73,25 @@ void setup_wifi() {
 
 
 void setup_mpu6050() {
-  MPU_I2C.begin(27, 26);
-  while (!mpu.begin(0x68, &MPU_I2C)) {
-    Serial.println("Tentando inicializar MPU6050... Verifique a conexão!");
-    delay(2000);
+  MPU_I2C.begin(21, 22);
+  mpu_ok = mpu.begin(0x68, &MPU_I2C);
+  if (mpu_ok) {
+    Serial.println("✅ MPU6050 inicializado com sucesso!");
+  } else {
+    Serial.println("❌ MPU6050 não encontrado!");
   }
-  Serial.println("MPU6050 inicializado com sucesso!");
 }
 
 
 void setup_bmp180() {
   BMP_I2C.begin(21, 22);
-  while (!bmp.begin(BMP085_ULTRAHIGHRES, &BMP_I2C)) {
-    Serial.println("Tentando inicializar BMP180... Verifique a conexão!");
-    delay(2000);
+  bmp_ok = bmp.begin(BMP085_ULTRAHIGHRES, &BMP_I2C);
+  if (bmp_ok) {
+    Serial.println("BMP180 inicializado com sucesso!");
+  } else {
+    Serial.println("❌ BMP180 não encontrado!");
   }
-  Serial.println("BMP180 inicializado com sucesso!");
 }
-
 
 
 
@@ -206,16 +210,11 @@ void DHT11_value() {
 
 
 void BMP180_value() {
-  if (bmp.begin(BMP085_ULTRAHIGHRES, &BMP_I2C)) {
-    float pressao = bmp.readPressure();
-    float altitude = bmp.readAltitude(101500);
-    doc["pressao"] = pressao;
-    doc["altitude"] = altitude;
-  } else {
-    Serial.println("❌ Erro ao acessar BMP180!");
-  }
+  float pressao = bmp.readPressure();
+  float altitude = bmp.readAltitude(101500);
+  doc["pressao"] = pressao;
+  doc["altitude"] = altitude;
 }
-
 
 void UMIDADESOLO_value() {
   float umidadeSolo = analogRead(UMIDADESOLO_PIN);
@@ -252,12 +251,18 @@ void loop() {
 
   doc.clear(); // <--- Limpa o JSON antes de preencher novamente
 
+ 
+
   LDR_value();
   SW520D_value();
   SW420_value();
+ if (mpu_ok) {
   MPU6050_value();
+}
   DHT11_value();
+  if (bmp_ok) {
   BMP180_value();
+}
   UMIDADESOLO_value();
 
 

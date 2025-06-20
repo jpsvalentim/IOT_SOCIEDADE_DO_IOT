@@ -12,6 +12,8 @@
 #include <ESP_WiFiManager.h>
 #include <PubSubClient.h>
 
+#define SDA_PIN 21
+#define SCL_PIN 22
 
 const char* ssid = "FIESC_IOT";
 const char* password = "C6qnM4ag81";
@@ -24,6 +26,9 @@ const int SW520D_PIN = 4;
 const int SW420_PIN = 13;
 const int UMIDADESOLO_PIN = 12;
 
+bool bmp_ok = false;
+bool mpu_ok = false;
+
 
 WiFiClient WOKWI_client;
 PubSubClient client(WOKWI_client);
@@ -32,11 +37,7 @@ Adafruit_MPU6050 mpu;
 Adafruit_BMP085 bmp;
 
 
-TwoWire MPU_I2C = TwoWire(0);
-TwoWire BMP_I2C = TwoWire(1);
-
-
-StaticJsonDocument<296> doc;
+StaticJsonDocument<512> doc;
 
 
 void setup_wifi() {
@@ -70,24 +71,23 @@ void setup_wifi() {
 
 
 void setup_mpu6050() {
-  MPU_I2C.begin(21, 22);
-  while (!mpu.begin(0x68, &MPU_I2C)) {
-    Serial.println("Tentando inicializar MPU6050... Verifique a conexão!");
-    delay(2000);
+  mpu_ok = mpu.begin();
+  if (mpu_ok) {
+    Serial.println("✅ MPU6050 inicializado com sucesso!");
+  } else {
+    Serial.println("❌ MPU6050 não encontrado!");
   }
-  Serial.println("MPU6050 inicializado com sucesso!");
 }
 
 
 void setup_bmp180() {
-  BMP_I2C.begin(21, 22);
-  while (!bmp.begin(BMP085_ULTRAHIGHRES, &BMP_I2C)) {
-    Serial.println("Tentando inicializar BMP180... Verifique a conexão!");
-    delay(2000);
+  bmp_ok = bmp.begin();
+  if (bmp_ok) {
+    Serial.println("BMP180 inicializado com sucesso!");
+  } else {
+    Serial.println("❌ BMP180 não encontrado!");
   }
-  Serial.println("BMP180 inicializado com sucesso!");
 }
-
 
 
 
@@ -109,7 +109,7 @@ void wifiReconnect() {
 
 void setup() {
   Serial.begin(115200);
-
+  Wire.begin(SDA_PIN, SCL_PIN);
 
   pinMode(18, OUTPUT);
   pinMode(19, OUTPUT);
@@ -177,23 +177,23 @@ void SW420_value() {
 }
 
 
-void MPU6050_value(){
+void MPU6050_value() {
   sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
 
+  if (mpu.getEvent(&a, &g, &temp)) {
+    JsonObject acelerometro = doc.createNestedObject("acelerometro");
+    acelerometro["x"] = a.acceleration.x;
+    acelerometro["y"] = a.acceleration.y;
+    acelerometro["z"] = a.acceleration.z;
 
-  JsonObject acelerometro = doc.createNestedObject("acelerometro");
-  acelerometro["x"] = a.acceleration.x;
-  acelerometro["y"] = a.acceleration.y;
-  acelerometro["z"] = a.acceleration.z;
-
-
-  JsonObject giroscopio = doc.createNestedObject("giroscopio");
-  giroscopio["x"] = g.gyro.x;
-  giroscopio["y"] = g.gyro.y;
-  giroscopio["z"] = g.gyro.z;
+    JsonObject giroscopio = doc.createNestedObject("giroscopio");
+    giroscopio["x"] = g.gyro.x;
+    giroscopio["y"] = g.gyro.y;
+    giroscopio["z"] = g.gyro.z;
+  } else {
+    Serial.println("❌ Erro ao acessar MPU6050!");
+  }
 }
-
 
 void DHT11_value() {
   float umidade = dht.readHumidity();
@@ -208,12 +208,9 @@ void DHT11_value() {
 void BMP180_value() {
   float pressao = bmp.readPressure();
   float altitude = bmp.readAltitude(101500);
-
-
-  doc["pressão"] = pressao;
+  doc["pressao"] = pressao;
   doc["altitude"] = altitude;
 }
-
 
 void UMIDADESOLO_value() {
   float umidadeSolo = analogRead(UMIDADESOLO_PIN);
@@ -250,14 +247,20 @@ void loop() {
 
   doc.clear(); // <--- Limpa o JSON antes de preencher novamente
 
+ 
+
   LDR_value();
   SW520D_value();
   SW420_value();
+ if (mpu_ok) {
   MPU6050_value();
+}
   DHT11_value();
+  if (bmp_ok) {
   BMP180_value();
+}
   UMIDADESOLO_value();
 
 
-  // data_publish();
+  data_publish();
 }

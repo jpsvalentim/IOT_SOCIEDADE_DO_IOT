@@ -70,7 +70,7 @@ void setup_wifi() {
 
 
 void setup_mpu6050() {
-  MPU_I2C.begin(27, 26);
+  MPU_I2C.begin(21, 22);
   while (!mpu.begin(0x68, &MPU_I2C)) {
     Serial.println("Tentando inicializar MPU6050... Verifique a conexão!");
     delay(2000);

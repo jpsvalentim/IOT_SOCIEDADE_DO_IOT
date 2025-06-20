@@ -12,6 +12,8 @@
 #include <ESP_WiFiManager.h>
 #include <PubSubClient.h>
 
+#define SDA_PIN 21
+#define SCL_PIN 22
 
 const char* ssid = "FIESC_IOT";
 const char* password = "C6qnM4ag81";
@@ -35,11 +37,7 @@ Adafruit_MPU6050 mpu;
 Adafruit_BMP085 bmp;
 
 
-TwoWire MPU_I2C = TwoWire(0);
-TwoWire BMP_I2C = TwoWire(1);
-
-
-StaticJsonDocument<296> doc;
+StaticJsonDocument<512> doc;
 
 
 void setup_wifi() {
@@ -73,8 +71,7 @@ void setup_wifi() {
 
 
 void setup_mpu6050() {
-  MPU_I2C.begin(21, 22);
-  mpu_ok = mpu.begin(0x68, &MPU_I2C);
+  mpu_ok = mpu.begin();
   if (mpu_ok) {
     Serial.println("✅ MPU6050 inicializado com sucesso!");
   } else {
@@ -84,8 +81,7 @@ void setup_mpu6050() {
 
 
 void setup_bmp180() {
-  BMP_I2C.begin(21, 22);
-  bmp_ok = bmp.begin(BMP085_ULTRAHIGHRES, &BMP_I2C);
+  bmp_ok = bmp.begin();
   if (bmp_ok) {
     Serial.println("BMP180 inicializado com sucesso!");
   } else {
@@ -113,7 +109,7 @@ void wifiReconnect() {
 
 void setup() {
   Serial.begin(115200);
-
+  Wire.begin(SDA_PIN, SCL_PIN);
 
   pinMode(18, OUTPUT);
   pinMode(19, OUTPUT);
@@ -266,5 +262,5 @@ void loop() {
   UMIDADESOLO_value();
 
 
-  // data_publish();
+  data_publish();
 }

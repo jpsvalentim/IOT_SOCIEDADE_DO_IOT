@@ -95,7 +95,7 @@ void setup_bmp180() {
 
 
 
-void wifiReconnect() {
+void wifi_MQTT_Reconnect() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi desconectado. Tentando reconectar...");
     WiFi.disconnect();
@@ -114,6 +114,17 @@ void wifiReconnect() {
       Serial.println("Falha na conexão WiFi.");
     }
   }
+    while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    if (client.connect("WOKWI_Client")) {
+      Serial.println("connected");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
 }
 
 
@@ -122,14 +133,16 @@ void setup() {
   Wire.begin(SDA_PIN, SCL_PIN);
 
   pinMode(5, OUTPUT);
-  pinMode(19, OUTPUT);
+  pinMode(18, OUTPUT);
   pinMode(LDR_PIN, INPUT);
   pinMode(SW520D_PIN, INPUT);
   pinMode(SW420_PIN, INPUT);
   pinMode(UMIDADESOLO_PIN, INPUT);
   pinMode(LED_STATUS_PIN, OUTPUT);  //led indicador do funcionamento de coleta de dados
   pinMode(BUZZER_PIN, OUTPUT); // buzer indicador de funcionamento
-  
+ 
+
+
   digitalWrite(BUZZER_PIN, LOW);
 
   Serial.println("Iniciando...");
@@ -173,9 +186,9 @@ void Conectado_WiFi() {
 
 void Conectado_broker() {
   if (client.connected()) {
-    digitalWrite(19, HIGH);
+    digitalWrite(18, HIGH);
   } else {
-    digitalWrite(19, LOW);
+    digitalWrite(18, LOW);
   }
 }
 
@@ -275,10 +288,12 @@ void data_publish() {
 
 void loop() {
   
-  wifiReconnect(); //colocar estrutura if para não entrar no reconect quando estiver conectado
+Conectado_broker();
+
+  wifi_MQTT_Reconnect(); //colocar estrutura if para não entrar no reconect quando estiver conectado
   
   Conectado_WiFi();
-  Conectado_broker();
+  
 
 
   client.loop(); // <--- ESSENCIAL para MQTT funcionar corretamente

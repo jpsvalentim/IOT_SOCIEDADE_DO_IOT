@@ -84,7 +84,7 @@ void setup_mpu6050() {
 }
 
 
-void setup_bmp180() {
+void setup_bmp180() { 
   bmp_ok = bmp.begin();
   if (bmp_ok) {
     Serial.println("BMP180 inicializado com sucesso!");
@@ -139,22 +139,20 @@ void setup() {
 
 void piscarStatusLED() {
   static unsigned long previousMillis = 0;
-  const long interval = 500; // meio segundo
+  const long interval = 500; // 0,5s
 
   unsigned long currentMillis = millis();
+
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
 
-    // 
-    bool estadoLED = !digitalRead(LED_STATUS_PIN);
-    digitalWrite(LED_STATUS_PIN, estadoLED);
+    // Alterna LED
+    digitalWrite(LED_STATUS_PIN, !digitalRead(LED_STATUS_PIN));
 
-    // Se o LED ligou, faz o buzzer apitar rapidinho
-    if (estadoLED) {
-      digitalWrite(BUZZER_PIN, HIGH);
-    } else {
-      digitalWrite(BUZZER_PIN, LOW);
-    }
+    // Buzzer bip curto junto
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(100);
+    digitalWrite(BUZZER_PIN, LOW);
   }
 }
 
@@ -176,7 +174,7 @@ void Conectado_broker() {
 }
 
 
-void LDR_value() {
+void LDR_value() { //SENSOR DE LUMINOSIDADE
   int data = analogRead(LDR_PIN);
   float voltage = data * (3.3 / 4095.0);
   float rFixo = 10000;
@@ -185,26 +183,29 @@ void LDR_value() {
 
 
   doc["lux"] = lux;
+  coletaAtiva = true;
 }
 
 
-void SW520D_value() {
+void SW520D_value() { // SENSOR DE VIBRAÇÃO
   int inclinacao = digitalRead(SW520D_PIN);
 
 
   doc["inclinação"] = inclinacao;
+  coletaAtiva = true;
 }
 
 
-void SW420_value() {
+void SW420_value() {// SENSOR DE ONCLINAÇÃO
   int vibracao = digitalRead(SW420_PIN);
 
 
   doc["vibracao"] = vibracao;
+  coletaAtiva = true;
 }
 
 
-void MPU6050_value() {
+void MPU6050_value() { // SENSOR GISROSCOPIO
   sensors_event_t a, g, temp;
 
   if (mpu.getEvent(&a, &g, &temp)) {
@@ -220,28 +221,32 @@ void MPU6050_value() {
   } else {
     Serial.println("❌ Erro ao acessar MPU6050!");
   }
+  coletaAtiva = true;
 }
 
-void DHT11_value() {
+void DHT11_value() { // SENSOR DE TEMPERATURA E UMIDADE DO AR
   float umidade = dht.readHumidity();
   float temperatura = dht.readTemperature();
 
   doc["temperatura"] = temperatura;
   doc["umidade"] = umidade;
+  coletaAtiva = true;
 }
 
 
-void BMP180_value() {
+void BMP180_value() { // SENSOR DE PRESÃO/ALTURA
   float pressao = bmp.readPressure();
   float altitude = bmp.readAltitude(101500);
   doc["pressao"] = pressao;
   doc["altitude"] = altitude;
+  coletaAtiva = true;
 }
 
-void UMIDADESOLO_value() {
+void UMIDADESOLO_value() { // SENSOR DE UMIDADE DO SOLO
   float umidadeSolo = analogRead(UMIDADESOLO_PIN);
 
   doc["umidadeSolo"] = umidadeSolo;
+  coletaAtiva = true;
 }
 
 
@@ -271,7 +276,7 @@ void loop() {
 
 
   client.loop(); // <--- ESSENCIAL para MQTT funcionar corretamente
-  piscarStatusLED();
+ 
 
   doc.clear(); // <--- Limpa o JSON antes de preencher novamente
 
@@ -291,4 +296,9 @@ void loop() {
 
 
   data_publish();
+
+  if (coletaAtiva) {
+  piscarStatusLED();
+  coletaAtiva = false;  // reseta para próxima iteração
+}
 }

@@ -121,7 +121,7 @@ void setup() {
   Serial.begin(115200);
   Wire.begin(SDA_PIN, SCL_PIN);
 
-  pinMode(18, OUTPUT);
+  pinMode(5, OUTPUT);
   pinMode(19, OUTPUT);
   pinMode(LDR_PIN, INPUT);
   pinMode(SW520D_PIN, INPUT);

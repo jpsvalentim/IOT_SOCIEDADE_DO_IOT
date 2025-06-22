@@ -26,7 +26,7 @@ const int DHT11_PIN = 33;
 const int LDR_PIN = 32;
 const int SW520D_PIN = 4;
 const int SW420_PIN = 13;
-const int UMIDADESOLO_PIN = 34; //mudança visto que o pino anterior cruzava com o uso do wifi // Significa que o GPIO12 (que está conectado ao sensor de umidade do solo) está ligado no ADC2, e no ESP32, o ADC2 não pode ser usado simultaneamente com o Wi-Fi ativo. É uma limitação da própria arquitetura do ESP32 quando o Wi-Fi está operando no modo station (STA).
+const int UMIDADESOLO_PIN = 27; //mudança visto que o pino anterior cruzava com o uso do wifi // Significa que o GPIO12 (que está conectado ao sensor de umidade do solo) está ligado no ADC2, e no ESP32, o ADC2 não pode ser usado simultaneamente com o Wi-Fi ativo. É uma limitação da própria arquitetura do ESP32 quando o Wi-Fi está operando no modo station (STA).
 
 
 bool bmp_ok = false;
@@ -96,16 +96,22 @@ void setup_bmp180() {
 
 
 void wifiReconnect() {
-  while (!client.connected()) {
-    Serial.print("Attempting MQTT conection...");
-    if (client.connect("WOKWI_client")) {
-      Serial.println("connected");
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi desconectado. Tentando reconectar...");
+    WiFi.disconnect();
+    WiFi.begin(ssid, password);
+    unsigned long startAttemptTime = millis();
+
+    // Tenta por 10 segundos
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
+      delay(100);
+      Serial.print(".");
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("Conectado!");
     } else {
-      Serial.print("failed, rec=");
-      Serial.print(client.state());
-      Serial.println("Try again in 5 seconds");
-     
-      delay(5000);
+      Serial.println("Falha na conexão WiFi.");
     }
   }
 }

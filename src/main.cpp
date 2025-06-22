@@ -1,7 +1,7 @@
 #define MQTT_MAX_PACKET_SIZE 512
 
 
-#include <Adafruit_BMP085.h>
+#include <Adafruit_BMP085.h> 
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_MPU6050.h>
@@ -12,11 +12,13 @@
 #include <ESP_WiFiManager.h>
 #include <PubSubClient.h>
 
-#define SDA_PIN 21
-#define SCL_PIN 22
+#define LED_STATUS_PIN 23 // led funcionamento do sistema(coleta de dados geral)
+#define SDA_PIN 21 // i2c
+#define SCL_PIN 22 // i2c
+#define BUZZER_PIN  2 //buzzer
 
-const char* ssid = "FIESC_IOT";
-const char* password = "C6qnM4ag81";
+const char* ssid = "RedmiVlad";
+const char* password = "12345678+-/";
 const char* mqtt_server = "test.mosquitto.org";
 
 
@@ -24,10 +26,12 @@ const int DHT11_PIN = 33;
 const int LDR_PIN = 32;
 const int SW520D_PIN = 4;
 const int SW420_PIN = 13;
-const int UMIDADESOLO_PIN = 12;
+const int UMIDADESOLO_PIN = 34; //mudança visto que o pino anterior cruzava com o uso do wifi // Significa que o GPIO12 (que está conectado ao sensor de umidade do solo) está ligado no ADC2, e no ESP32, o ADC2 não pode ser usado simultaneamente com o Wi-Fi ativo. É uma limitação da própria arquitetura do ESP32 quando o Wi-Fi está operando no modo station (STA).
+
 
 bool bmp_ok = false;
 bool mpu_ok = false;
+bool coletaAtiva = false; //variável bool coletaAtiva que fica true quando pelo menos um sensor coleta e atualiza seu valor no doc, e com base nessa variável a função piscarStatusLED() seria chamada ou não
 
 
 WiFiClient WOKWI_client;
@@ -117,7 +121,10 @@ void setup() {
   pinMode(SW520D_PIN, INPUT);
   pinMode(SW420_PIN, INPUT);
   pinMode(UMIDADESOLO_PIN, INPUT);
-
+  pinMode(LED_STATUS_PIN, OUTPUT);  //led indicador do funcionamento de coleta de dados
+  pinMode(BUZZER_PIN, OUTPUT); // buzer indicador de funcionamento
+  
+  digitalWrite(BUZZER_PIN, LOW);
 
   Serial.println("Iniciando...");
 
@@ -130,12 +137,32 @@ void setup() {
   Serial.println("🚀 ESP32 inicializado com sucesso!");
 }
 
+void piscarStatusLED() {
+  static unsigned long previousMillis = 0;
+  const long interval = 500; // meio segundo
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    // 
+    bool estadoLED = !digitalRead(LED_STATUS_PIN);
+    digitalWrite(LED_STATUS_PIN, estadoLED);
+
+    // Se o LED ligou, faz o buzzer apitar rapidinho
+    if (estadoLED) {
+      digitalWrite(BUZZER_PIN, HIGH);
+    } else {
+      digitalWrite(BUZZER_PIN, LOW);
+    }
+  }
+}
 
 void Conectado_WiFi() {
   if (WiFi.status()) {
-    digitalWrite(18, HIGH);
+    digitalWrite(5, HIGH);
   } else {
-    digitalWrite(18, LOW);
+    digitalWrite(5, LOW);
   }
 }
 
@@ -244,6 +271,7 @@ void loop() {
 
 
   client.loop(); // <--- ESSENCIAL para MQTT funcionar corretamente
+  piscarStatusLED();
 
   doc.clear(); // <--- Limpa o JSON antes de preencher novamente
 

@@ -199,7 +199,6 @@ void DHT11_value() {
   float umidade = dht.readHumidity();
   float temperatura = dht.readTemperature();
 
-
   doc["temperatura"] = temperatura;
   doc["umidade"] = umidade;
 }
@@ -214,7 +213,6 @@ void BMP180_value() {
 
 void UMIDADESOLO_value() {
   float umidadeSolo = analogRead(UMIDADESOLO_PIN);
-
 
   doc["umidadeSolo"] = umidadeSolo;
 }
@@ -238,7 +236,9 @@ void data_publish() {
 
 
 void loop() {
-  wifiReconnect();
+  
+  wifiReconnect(); //colocar estrutura if para não entrar no reconect quando estiver conectado
+  
   Conectado_WiFi();
   Conectado_broker();
 

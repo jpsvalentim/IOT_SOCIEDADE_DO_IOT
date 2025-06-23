@@ -238,10 +238,38 @@ void MPU6050_value() { // SENSOR GISROSCOPIO
     giroscopio["y"] = g.gyro.y;
     giroscopio["z"] = g.gyro.z;
   } else {
-    Serial.println("❌ Erro ao acessar MPU6050!");
+   Serial.println("❌ Erro ao acessar MPU6050!");
+    // Se falhar, coloca null no JSON
+    JsonObject acelerometro = doc.createNestedObject("acelerometro");
+    acelerometro["x"] = nullptr;
+    acelerometro["y"] = nullptr;
+    acelerometro["z"] = nullptr;
+
+    JsonObject giroscopio = doc.createNestedObject("giroscopio");
+    giroscopio["x"] = nullptr;
+    giroscopio["y"] = nullptr;
+    giroscopio["z"] = nullptr;
   }
   coletaAtiva = true;
 }
+
+
+void BMP180_value() {
+  if (bmp_ok) {
+    float pressao = bmp.readPressure();
+    float altitude = bmp.readAltitude(101500);
+    doc["pressao"] = pressao;
+    doc["altitude"] = altitude;
+  } else {
+    doc["pressao"] = nullptr;
+    doc["altitude"] = nullptr;
+    Serial.println("❌ Erro ao acessar BMP180!");
+  }
+
+  coletaAtiva = true;
+}
+
+
 
 void DHT11_value() { // SENSOR DE TEMPERATURA E UMIDADE DO AR
   float umidade = dht.readHumidity();
@@ -253,13 +281,7 @@ void DHT11_value() { // SENSOR DE TEMPERATURA E UMIDADE DO AR
 }
 
 
-void BMP180_value() { // SENSOR DE PRESÃO/ALTURA
-  float pressao = bmp.readPressure();
-  float altitude = bmp.readAltitude(101500);
-  doc["pressao"] = pressao;
-  doc["altitude"] = altitude;
-  coletaAtiva = true;
-}
+
 
 void UMIDADESOLO_value() { // SENSOR DE UMIDADE DO SOLO
   float umidadeSolo = analogRead(UMIDADESOLO_PIN);

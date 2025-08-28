@@ -153,7 +153,7 @@ void setup() {
   setup_bmp180();
   dht.begin();
   client.setServer(mqtt_server, 1883);
-  Serial.println("🚀 ESP32 inicializado com sucesso!");
+  Serial.println("ESP32 inicializado com sucesso!");
 }
 
 void piscarStatusLED() {
@@ -238,7 +238,7 @@ void MPU6050_value() { // SENSOR GISROSCOPIO
     giroscopio["y"] = g.gyro.y;
     giroscopio["z"] = g.gyro.z;
   } else {
-   Serial.println("❌ Erro ao acessar MPU6050!");
+   Serial.println("Erro ao acessar MPU6050!");
     // Se falhar, coloca null no JSON
     JsonObject acelerometro = doc.createNestedObject("acelerometro");
     acelerometro["x"] = nullptr;
@@ -263,7 +263,7 @@ void BMP180_value() {
   } else {
     doc["pressao"] = nullptr;
     doc["altitude"] = nullptr;
-    Serial.println("❌ Erro ao acessar BMP180!");
+    Serial.println("Erro ao acessar BMP180!");
   }
 
   coletaAtiva = true;

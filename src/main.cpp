@@ -61,6 +61,40 @@ void setup_wifi() {
   }
 }
 
+void scanI2C() {
+  Serial.println("Escaneando barramento I2C...");
+  byte error, address;
+  int nDevices = 0;
+
+  for (address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      Serial.print("Dispositivo I2C encontrado no endereço 0x");
+      if (address < 16) {
+        Serial.print("0");
+      }
+      Serial.print(address, HEX);
+      Serial.println(" !");
+
+      nDevices++;
+    } else if (error == 4) {
+      Serial.print("Erro desconhecido no endereço 0x");
+      if (address < 16) {
+        Serial.print("0");
+      }
+      Serial.println(address, HEX);
+    }
+  }
+  if (nDevices == 0) {
+    Serial.println("Nenhum dispositivo I2C encontrado\n");
+  } else {
+    Serial.println("Escaneamento I2C concluído\n");
+  }
+}
+
+
 void setup_mpu6050() {
   if (!mpu.begin()) {
     Serial.println("MPU6050 não encontrado!");
@@ -290,20 +324,3 @@ void loop() {
   }
 }
 
-void scanI2C() {
-  byte error, address;
-  int nDevices = 0;
-  Serial.println("Scanning I2C devices...");
-  for (address = 1; address < 127; address++) {
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
-    if (error == 0) {
-      Serial.print("I2C device found at 0x");
-      Serial.println(address, HEX);
-      nDevices++;
-    }
-  }
-  if (nDevices == 0) {
-    Serial.println("No I2C devices found!");
-  }
-}

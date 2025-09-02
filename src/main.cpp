@@ -1,347 +1,171 @@
 #define MQTT_MAX_PACKET_SIZE 512
 
-
-#include <Adafruit_BMP085.h> 
+#include <Adafruit_BMP280.h>
 #include <Wire.h>
-#include <Adafruit_Sensor.h>
 #include <Adafruit_MPU6050.h>
 #include <ArduinoJson.h>
-#include <ArduinoJson.hpp>
 #include <DHT.h>
-#include <DHT_U.h>
-#include <ESP_WiFiManager.h>
 #include <PubSubClient.h>
 
-#define LED_STATUS_PIN 23 // led funcionamento do sistema(coleta de dados geral)
-#define SDA_PIN 21 // i2c
-#define SCL_PIN 22 // i2c
-#define BUZZER_PIN  2 //buzzer
+#define LED_STATUS_PIN 23
+#define SDA_PIN 21
+#define SCL_PIN 22
+#define BUZZER_PIN 2
 
-const char* ssid = "RedmiVlad";
-const char* password = "12345678+-/";
-const char* mqtt_server = "test.mosquitto.org";
+const char *ssid = "raquelis";
+const char *password = "13082000";
+const char *mqtt_server = "test.mosquitto.org";
 
-
-const int DHT11_PIN = 33;
+const int DHT22_PIN = 33;
 const int LDR_PIN = 32;
-const int SW520D_PIN = 4;
+const int SW520D_PIN 14;
 const int SW420_PIN = 13;
-const int UMIDADESOLO_PIN = 27; //mudança visto que o pino anterior cruzava com o uso do wifi // Significa que o GPIO12 (que está conectado ao sensor de umidade do solo) está ligado no ADC2, e no ESP32, o ADC2 não pode ser usado simultaneamente com o Wi-Fi ativo. É uma limitação da própria arquitetura do ESP32 quando o Wi-Fi está operando no modo station (STA).
-
+const int GUVA = 35;
+const int UMIDADESOLO_PIN = 34;
 
 bool bmp_ok = false;
 bool mpu_ok = false;
-bool coletaAtiva = false; //variável bool coletaAtiva que fica true quando pelo menos um sensor coleta e atualiza seu valor no doc, e com base nessa variável a função piscarStatusLED() seria chamada ou não
+bool coletaAtiva = false;
 
-
-WiFiClient WOKWI_client;
-PubSubClient client(WOKWI_client);
-DHT dht(DHT11_PIN, DHT11);
+WiFiClient espClient;
+PubSubClient client(espClient);
+DHT dht(DHT22_PIN, DHT22);
 Adafruit_MPU6050 mpu;
-Adafruit_BMP085 bmp;
-
-
+Adafruit_BMP280 bmp;
 StaticJsonDocument<512> doc;
 
-
 void setup_wifi() {
-  delay(10);
-  Serial.println();
-  Serial.print("connecting to");
-  Serial.println(ssid);
-
-
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-
-
   int tentativas = 0;
   while (WiFi.status() != WL_CONNECTED && tentativas < 20) {
     delay(500);
     Serial.print(".");
     tentativas++;
   }
-
-
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("");
-    Serial.println("WiFi conectado!");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\nFalha ao conectar ao Wi-Fi. Verifique SSID/senha.");
+    Serial.println("WiFi conectado! IP: " + WiFi.localIP().toString());
   }
 }
-
 
 void setup_mpu6050() {
-  mpu_ok = mpu.begin();
-  if (mpu_ok) {
-    Serial.println("✅ MPU6050 inicializado com sucesso!");
-  } else {
-    Serial.println("❌ MPU6050 não encontrado!");
+  if (!mpu.begin()) {
+    Serial.println("MPU6050 não encontrado!");
+    mpu_ok = false;
+    return;
   }
+  mpu_ok = true;
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
+  Serial.println("MPU6050 OK");
 }
 
-
-void setup_bmp180() { 
-  bmp_ok = bmp.begin();
-  if (bmp_ok) {
-    Serial.println("BMP180 inicializado com sucesso!");
-  } else {
-    Serial.println("❌ BMP180 não encontrado!");
+void setup_bmp280() {
+  if (!bmp.begin(0x76)) {
+    if (!bmp.begin(0x77)) {
+      Serial.println("BMP280 não encontrado em 0x76 ou 0x77!");
+      bmp_ok = false;
+      return;
+    }
   }
+  bmp_ok = true;
+  Serial.println("BMP280 OK");
 }
-
-
 
 void wifi_MQTT_Reconnect() {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi desconectado. Tentando reconectar...");
-    WiFi.disconnect();
     WiFi.begin(ssid, password);
-    unsigned long startAttemptTime = millis();
-
-    // Tenta por 10 segundos
-    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
-      delay(100);
-      Serial.print(".");
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("Conectado!");
-    } else {
-      Serial.println("Falha na conexão WiFi.");
-    }
+    delay(5000); // Temporário, substitua por millis()
   }
-    while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    if (client.connect("WOKWI_Client")) {
-      Serial.println("connected");
+  while (!client.connected()) {
+    if (client.connect("ESP32_Client")) {
+      Serial.println("MQTT conectado");
     } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      delay(5000);
+      Serial.println("MQTT falhou, rc=" + String(client.state()));
+      delay(2000);
     }
   }
 }
-
 
 void setup() {
   Serial.begin(115200);
   Wire.begin(SDA_PIN, SCL_PIN);
+  scanI2C(); // Diagnóstico I2C
 
-  pinMode(5, OUTPUT);
-  pinMode(18, OUTPUT);
-  pinMode(LDR_PIN, INPUT);
-  pinMode(SW520D_PIN, INPUT);
-  pinMode(SW420_PIN, INPUT);
-  pinMode(UMIDADESOLO_PIN, INPUT);
-  pinMode(LED_STATUS_PIN, OUTPUT);  //led indicador do funcionamento de coleta de dados
-  pinMode(BUZZER_PIN, OUTPUT); // buzer indicador de funcionamento
- 
-
-
-  digitalWrite(BUZZER_PIN, LOW);
-
-  Serial.println("Iniciando...");
-
+  pinMode(LED_STATUS_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(5, OUTPUT); // WiFi
+  pinMode(19, OUTPUT); // MQTT
 
   setup_wifi();
   setup_mpu6050();
-  setup_bmp180();
+  setup_bmp280();
   dht.begin();
   client.setServer(mqtt_server, 1883);
-  Serial.println("ESP32 inicializado com sucesso!");
+  Serial.println("ESP32 inicializado!");
 }
 
 void piscarStatusLED() {
-  static unsigned long previousMillis = 0;
-  const long interval = 500; // 0,5s
-
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-
-    // Alterna LED
+  static unsigned long lastBlink = 0;
+  if (millis() - lastBlink >= 500) {
     digitalWrite(LED_STATUS_PIN, !digitalRead(LED_STATUS_PIN));
-
-    // Buzzer bip curto junto
     digitalWrite(BUZZER_PIN, HIGH);
-    delay(100);
+    delay(50);
     digitalWrite(BUZZER_PIN, LOW);
+    lastBlink = millis();
   }
 }
 
-void Conectado_WiFi() {
-  if (WiFi.status()) {
-    digitalWrite(5, HIGH);
-  } else {
-    digitalWrite(5, LOW);
-  }
-}
-
-
-void Conectado_broker() {
-  if (client.connected()) {
-    digitalWrite(18, HIGH);
-  } else {
-    digitalWrite(18, LOW);
-  }
-}
-
-
-void LDR_value() { //SENSOR DE LUMINOSIDADE
-  int data = analogRead(LDR_PIN);
-  float voltage = data * (3.3 / 4095.0);
-  float rFixo = 10000;
-  float resistance = (voltage * rFixo) / (3.3 - voltage);
-  float lux = 500000.0 / resistance;
-
-
-  doc["lux"] = lux;
-  coletaAtiva = true;
-}
-
-
-void SW520D_value() { // SENSOR DE VIBRAÇÃO
-  int inclinacao = digitalRead(SW520D_PIN);
-
-
-  doc["inclinação"] = inclinacao;
-  coletaAtiva = true;
-}
-
-
-void SW420_value() {// SENSOR DE ONCLINAÇÃO
-  int vibracao = digitalRead(SW420_PIN);
-
-
-  doc["vibracao"] = vibracao;
-  coletaAtiva = true;
-}
-
-
-void MPU6050_value() { // SENSOR GISROSCOPIO
+void MPU6050_value() {
+  if (!mpu_ok) return;
   sensors_event_t a, g, temp;
-
   if (mpu.getEvent(&a, &g, &temp)) {
-    JsonObject acelerometro = doc.createNestedObject("acelerometro");
-    acelerometro["x"] = a.acceleration.x;
-    acelerometro["y"] = a.acceleration.y;
-    acelerometro["z"] = a.acceleration.z;
-
-    JsonObject giroscopio = doc.createNestedObject("giroscopio");
-    giroscopio["x"] = g.gyro.x;
-    giroscopio["y"] = g.gyro.y;
-    giroscopio["z"] = g.gyro.z;
-  } else {
-   Serial.println("Erro ao acessar MPU6050!");
-    // Se falhar, coloca null no JSON
-    JsonObject acelerometro = doc.createNestedObject("acelerometro");
-    acelerometro["x"] = nullptr;
-    acelerometro["y"] = nullptr;
-    acelerometro["z"] = nullptr;
-
-    JsonObject giroscopio = doc.createNestedObject("giroscopio");
-    giroscopio["x"] = nullptr;
-    giroscopio["y"] = nullptr;
-    giroscopio["z"] = nullptr;
+    doc["acelerometro"]["x"] = a.acceleration.x;
+    doc["acelerometro"]["y"] = a.acceleration.y;
+    doc["acelerometro"]["z"] = a.acceleration.z;
+    doc["giroscopio"]["x"] = g.gyro.x;
+    doc["giroscopio"]["y"] = g.gyro.y;
+    doc["giroscopio"]["z"] = g.gyro.z;
+    coletaAtiva = true;
   }
+}
+
+void BMP280_value() {
+  if (!bmp_ok) return;
+  doc["pressao"] = bmp.readPressure();
+  doc["altitude"] = bmp.readAltitude(101500);
   coletaAtiva = true;
 }
 
-
-void BMP180_value() {
-  if (bmp_ok) {
-    float pressao = bmp.readPressure();
-    float altitude = bmp.readAltitude(101500);
-    doc["pressao"] = pressao;
-    doc["altitude"] = altitude;
-  } else {
-    doc["pressao"] = nullptr;
-    doc["altitude"] = nullptr;
-    Serial.println("Erro ao acessar BMP180!");
-  }
-
-  coletaAtiva = true;
-}
-
-
-
-void DHT11_value() { // SENSOR DE TEMPERATURA E UMIDADE DO AR
-  float umidade = dht.readHumidity();
-  float temperatura = dht.readTemperature();
-
-  doc["temperatura"] = temperatura;
-  doc["umidade"] = umidade;
-  coletaAtiva = true;
-}
-
-
-
-
-void UMIDADESOLO_value() { // SENSOR DE UMIDADE DO SOLO
-  float umidadeSolo = analogRead(UMIDADESOLO_PIN);
-
-  doc["umidadeSolo"] = umidadeSolo;
-  coletaAtiva = true;
-}
-
-
-void data_publish() {
-  char buffer[256];
-  serializeJson(doc, buffer);
-
-
-  client.publish("monitoramento/encosta", buffer);
-
-
-  Serial.println("JSON publicado:");
-  serializeJsonPretty(doc, Serial);
-  Serial.println();
-
-
-  delay(2500);
-}
-
-
+// [Adicione outras funções como LDR_value, etc., com millis()]
 void loop() {
-  
-Conectado_broker();
+  client.loop();
+  if (!client.connected()) wifi_MQTT_Reconnect();
 
-  wifi_MQTT_Reconnect(); //colocar estrutura if para não entrar no reconect quando estiver conectado
-  
-  Conectado_WiFi();
-  
-
-
-  client.loop(); // <--- ESSENCIAL para MQTT funcionar corretamente
- 
-
-  doc.clear(); // <--- Limpa o JSON antes de preencher novamente
-
- 
-
-  LDR_value();
-  SW520D_value();
-  SW420_value();
- if (mpu_ok) {
-  MPU6050_value();
+  static unsigned long lastRead = 0;
+  if (millis() - lastRead >= 1000) {
+    doc.clear();
+    coletaAtiva = false;
+    MPU6050_value();
+    BMP280_value(); // Teste só esses primeiro
+    if (coletaAtiva) piscarStatusLED();
+    lastRead = millis();
+  }
 }
-  DHT11_value();
-  if (bmp_ok) {
-  BMP180_value();
-}
-  UMIDADESOLO_value();
 
-
-  data_publish();
-
-  if (coletaAtiva) {
-  piscarStatusLED();
-  coletaAtiva = false;  // reseta para próxima iteração
-}
+void scanI2C() {
+  byte error, address;
+  int nDevices = 0;
+  Serial.println("Scanning I2C...");
+  for (address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+    if (error == 0) {
+      Serial.print("Device at 0x");
+      Serial.println(address, HEX);
+      nDevices++;
+    }
+  }
+  if (nDevices == 0) Serial.println("No I2C devices!");
 }

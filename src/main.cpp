@@ -4,11 +4,11 @@
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_MPU6050.h>
-#include <ArduinoJson.h>
+#include <Adafruit_BME680.h>
 #include <DHT.h>
+#include <ArduinoJson.h>
 #include <PubSubClient.h>
 #include <ESP_WiFiManager.h>
-#include <Adafruit_BMP280.h>
 
 const char *ssid = "raquelis";
 const char *password = "13082000";
@@ -25,7 +25,7 @@ WiFiClient WOKWI_client;
 PubSubClient client(WOKWI_client);
 DHT dht(DHT22_PIN, DHT22);
 Adafruit_MPU6050 mpu;
-Adafruit_BMP280 bmp;
+Adafruit_BME680 bme(&Wire);
 
 StaticJsonDocument<512> doc;
 
@@ -70,9 +70,9 @@ void setup_mpu6050()
   Serial.println("MPU6050 inicializado com sucesso!");
 }
 
-void setup_bmp280()
+void setup_bme680()
 {
-  while (!bmp.begin(0x76))
+  while (!bme.begin())
   {
     Serial.println("Tentando inicializar BMP280... Verifique a conexão!");
     delay(2000);
@@ -136,7 +136,7 @@ void setup()
 
   setup_wifi();
   setup_mpu6050();
-  // setup_bmp280();
+  setup_bme680();
   dht.begin();
   client.setServer(mqtt_server, 1883);
   Serial.println("ESP32 inicializado com sucesso!");
@@ -186,10 +186,10 @@ void DHT22_value()
   doc["umidade"] = umidade;
 }
 
-void BMP280_value()
+void BME680_value()
 {
-  float pressao = bmp.readPressure();
-  float altitude = bmp.readAltitude(101500);
+  float pressao = bme.pressure();
+  float altitude = bme.readAltitude(1013.25);
 
   doc["pressao"] = pressao;
   doc["altitude"] = altitude;
@@ -238,7 +238,7 @@ void loop()
   DHT22_value();
   UMIDADESOLO_value();
   GUVA_value();
-  // BMP280_value();
+  BME680_value();
   MPU6050_value();
   SW520D_value();
   SW18015P_value();

@@ -10,8 +10,8 @@
 #include <PubSubClient.h>
 #include <ESP_WiFiManager.h>
 
-const char *ssid = "raquelis";
-const char *password = "13082000";
+const char *ssid = "Juia";
+const char *password = "12345678";
 const char *mqtt_server = "test.mosquitto.org";
 
 const int DHT22_PIN = 33;
@@ -27,7 +27,7 @@ DHT dht(DHT22_PIN, DHT22);
 Adafruit_MPU6050 mpu;
 Adafruit_BME680 bme(&Wire);
 
-StaticJsonDocument<512> doc;
+JsonDocument doc;
 
 void setup_wifi()
 {
@@ -74,10 +74,10 @@ void setup_bme680()
 {
   while (!bme.begin())
   {
-    Serial.println("Tentando inicializar BMP280... Verifique a conexão!");
+    Serial.println("Tentando inicializar BME680... Verifique a conexão!");
     delay(2000);
   }
-  Serial.println("BMP280 inicializado com sucesso!");
+  Serial.println("BME680 inicializado com sucesso!");
 }
 
 void wifi_MQTT_Reconnect()
@@ -188,7 +188,12 @@ void DHT22_value()
 
 void BME680_value()
 {
-  float pressao = bme.pressure();
+  if (! bme.performReading()) {
+    Serial.println("Falha na leitura do BME680!");
+    return;
+  }
+
+  float pressao = bme.pressure / 100.0;
   float altitude = bme.readAltitude(1013.25);
 
   doc["pressao"] = pressao;
@@ -200,12 +205,12 @@ void MPU6050_value()
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  JsonObject acelerometro = doc.createNestedObject("acelerometro");
+  JsonObject acelerometro = doc["acelerometro"].to<JsonObject>();
   acelerometro["x"] = a.acceleration.x;
   acelerometro["y"] = a.acceleration.y;
   acelerometro["z"] = a.acceleration.z;
 
-  JsonObject giroscopio = doc.createNestedObject("giroscopio");
+  JsonObject giroscopio = doc["giroscopio"].to<JsonObject>();
   giroscopio["x"] = g.gyro.x;
   giroscopio["y"] = g.gyro.y;
   giroscopio["z"] = g.gyro.z;
@@ -216,7 +221,7 @@ void data_publish()
   char buffer[512];
   serializeJson(doc, buffer);
 
-  client.publish("dispositivos/device2/dados", buffer);
+  client.publish("dispositivos/device1/dados", buffer);
 
   Serial.println("JSON publicado:");
   serializeJsonPretty(doc, Serial);
